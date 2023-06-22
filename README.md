@@ -16,7 +16,7 @@ Usage
 
     bash
 
-git clone https://github.com/your-username/repository.git
+git clone https://github.com/Madprojets/LINUX-BASH-AUTOMATIONS.git
 cd repository
 
 Make the script executable.
