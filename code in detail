@@ -1,0 +1,130 @@
+#!/bin/bash
+
+This line is called the shebang and specifies the interpreter to be used to run the script, which is /bin/bash in this case.
+
+
+
+declare -a dependencies=("nmap" "gnuplot")
+
+This line declares an array variable called dependencies and assigns it two values: "nmap" and "gnuplot". These are the software dependencies required by the script.
+
+
+for dependency in "${dependencies[@]}"; do
+
+This line starts a loop that iterates over each element in the dependencies array.
+
+
+if ! command -v "$dependency" &> /dev/null; then
+    echo "$dependency is not installed. Installing..."
+    sudo apt-get install -y "$dependency"
+fi
+
+This block of code checks if the command specified by $dependency is available by using the command -v command. If the command is not found, it means the corresponding software is not installed. In that case, it prints a message and attempts to install the software using apt-get with sudo.
+
+
+read -p "Enter the IP address range (e.g., 192.168.1.0/24): " ip_address_range
+
+This line prompts the user to enter an IP address range and stores the input in the variable ip_address_range. The -p option is used to display a prompt message to the user.
+
+
+echo "Performing host discovery..."
+nmap -sn "$ip_address_range" -oG hosts.txt > /dev/null
+
+This line performs host discovery using the nmap command. It scans the specified IP address range for live hosts (-sn option) and saves the output in the hosts.txt file. The > /dev/null part is used to discard the standard output of the nmap command.
+
+
+
+host_list=$(grep "Status: Up" hosts.txt | cut -d " " -f 2)
+
+This line extracts the list of hosts with the status "Up" from the hosts.txt file. It uses grep to find lines containing "Status: Up" and cut to extract the second field (the IP address or hostname).
+
+
+if [[ -z "$host_list" ]]; then
+    echo "No hosts found. Exiting..."
+    rm hosts.txt
+    exit 1
+fi
+
+This block of code checks if the host_list variable is empty, indicating that no hosts were found. If that's the case, it prints a message, removes the hosts.txt file, and exits the script with an exit code of 1.
+
+
+echo "Performing vulnerability assessment on discovered hosts..."
+
+This line simply displays a message indicating that the vulnerability assessment is being performed.
+
+
+for host in $host_list; do
+
+This line starts a loop that iterates over each host in the host_list.
+
+
+echo "Assessing vulnerabilities on $host..."
+nmap -p 1-65535 --script vuln "$host" > "$host"_vulnerability_assessment.txt
+
+This block of code prints a message indicating the host being assessed and runs the nmap command with the --script vuln option to perform vulnerability assessment on the specified host. The output is saved in a file named $host_vulnerability_assessment.txt.
+
+
+echo "Compiling the report..."
+
+This line simply displays a message indicating that the report is being compiled.
+
+
+echo "Hosts and Vulnerabilities:" > report.txt
+echo "------------------------" >> report.txt
+echo "" >> report.txt
+
+These lines create the initial content of the report.txt file, including the section title and some separator lines.
+
+
+for host in $host_list; do
+
+This line starts a loop that iterates over each host in the host_list.
+
+echo "Host: $host" >> report.txt
+echo "Vulnerabilities:" >> report.txt
+grep "VULNERABLE:" "$host"_vulnerability_assessment.txt | cut -d ":" -f 2- >> report.txt
+echo "" >> report.txt
+
+This block of code appends the host name, the "Vulnerabilities" section title, and the vulnerable findings from the vulnerability assessment output file ("$host"_vulnerability_assessment.txt) to the report.txt file.
+
+echo "Time Taken per Host:" >> report.txt
+echo "--------------------" >> report.txt
+echo "" >> report.txt
+
+These lines append the initial content for the "Time Taken per Host" section of the report.
+
+echo "Host,Time (seconds)" > time_taken.csv
+
+This line creates the time_taken.csv file and writes the header line.
+
+
+for host in $host_list; do
+
+This line starts a loop that iterates over each host in the host_list.
+
+time_taken=$(grep "Nmap done" "$host"_vulnerability_assessment.txt | awk '{print $(NF-1)}' | cut -d ")" -f 1)
+echo "$host,$time_taken" >> time_taken.csv
+
+This block of code extracts the time taken for the vulnerability assessment on each host from the corresponding vulnerability assessment output file ("$host"_vulnerability_assessment.txt). It uses grep, awk, and cut to extract the time value and appends the host and time data to the time_taken.csv file.
+
+if [[ -s "time_taken.csv" ]]; then
+    gnuplot <<-EOFMarker
+        set term pngcairo
+        set output 'time_taken.png'
+        set title "Time Taken per Host"
+        set xlabel "Host"
+        set ylabel "Time (seconds)"
+        set style data histograms
+        set style fill solid
+        plot 'time_taken.csv' using 2 with histogram
+EOFMarker
+    echo "Graph of Time Taken per Host saved as time_taken.png" >> report.txt
+else
+    echo "No valid data points found for the histogram. Skipping graph generation." >> report.txt
+fi
+
+This block of code checks if the time_taken.csv file has any data. If it does, it uses gnuplot to generate a histogram graph of the time taken per host and saves it as time_taken.png. If there are no valid data points, it prints a message indicating that the graph generation is skipped.
+
+echo "Project completed!"
+
+This line simply displays a message indicating that the project is completed.
